@@ -3,6 +3,8 @@ services:
     profiles: [""]
     build:
       context: .
+      args:
+        GRAPHITI_VERSION: "0.28.2"
     ports:
       - "8000:8000"
     healthcheck:
@@ -65,6 +67,7 @@ services:
   graph-falkordb:
     build:
       args:
+        GRAPHITI_VERSION: "0.28.2"
         INSTALL_FALKORDB: "true"
       context: .
     profiles: ["falkordb"]

@@ -2,7 +2,7 @@
 FROM python:3.12-slim
 
 # Inherit build arguments for labels
-ARG GRAPHITI_VERSION
+ARG GRAPHITI_VERSION=0.28.2
 ARG BUILD_DATE
 ARG VCS_REF
 

@@ -23,6 +23,26 @@ The automated release workflow:
 
 Only stable releases are built automatically (pre-release versions are skipped).
 
+## Native Episode Ingest
+
+The REST server exposes `POST /episodes` for native `graphiti.add_episode(...)` ingestion.
+
+- `source` supports `message`, `text`, and `json`
+- `episode_body` is passed through directly to Graphiti
+- the endpoint directly calls `graphiti.add_episode(...)` and returns the native result payload
+
+Example:
+
+```json
+{
+  "group_id": "demo",
+  "name": "daily-summary",
+  "episode_body": "{\"customer_id\":\"123\",\"plan\":\"pro\"}",
+  "source": "json",
+  "source_description": "crm webhook"
+}
+```
+
 ## Running Instructions
 
 1. Ensure you have Docker and Docker Compose installed on your system.
@@ -76,3 +96,11 @@ Only stable releases are built automatically (pre-release versions are skipped).
 6. You may access the swagger docs at `http://localhost:8000/docs`. You may also access redocs at `http://localhost:8000/redoc`.
 
 7. You may also access the neo4j browser at `http://localhost:7474` (the port depends on the neo4j instance you are using).
+
+## Building A Pinned Image
+
+The repository Dockerfile defaults `GRAPHITI_VERSION` to `0.28.2`, so a plain build stays pinned:
+
+```bash
+docker build -t your-registry/graphiti-rest:0.28.2 .
+```

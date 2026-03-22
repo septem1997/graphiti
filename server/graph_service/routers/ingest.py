@@ -3,10 +3,11 @@ from contextlib import asynccontextmanager
 from functools import partial
 
 from fastapi import APIRouter, FastAPI, status
+from graphiti_core.graphiti import AddEpisodeResults  # type: ignore
 from graphiti_core.nodes import EpisodeType  # type: ignore
 from graphiti_core.utils.maintenance.graph_data_operations import clear_data  # type: ignore
 
-from graph_service.dto import AddEntityNodeRequest, AddMessagesRequest, Message, Result
+from graph_service.dto import AddEntityNodeRequest, AddEpisodeRequest, AddMessagesRequest, Message, Result
 from graph_service.zep_graphiti import ZepGraphitiDep
 
 
@@ -48,26 +49,67 @@ async def lifespan(_: FastAPI):
 router = APIRouter(lifespan=lifespan)
 
 
-@router.post('/messages', status_code=status.HTTP_202_ACCEPTED)
+def get_message_episode_body(message: Message) -> str:
+    return f'{message.role or ""}({message.role_type}): {message.content}'
+
+
+@router.post(
+    '/messages',
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=Result,
+    summary='Queue chat messages for asynchronous ingestion',
+    description='Accepts message batches and enqueues them for sequential Graphiti processing.',
+)
 async def add_messages(
     request: AddMessagesRequest,
     graphiti: ZepGraphitiDep,
 ):
-    async def add_messages_task(m: Message):
+    async def add_messages_task(message: Message):
         await graphiti.add_episode(
-            uuid=m.uuid,
+            uuid=message.uuid,
             group_id=request.group_id,
-            name=m.name,
-            episode_body=f'{m.role or ""}({m.role_type}): {m.content}',
-            reference_time=m.timestamp,
+            name=message.name,
+            episode_body=get_message_episode_body(message),
+            reference_time=message.timestamp,
             source=EpisodeType.message,
-            source_description=m.source_description,
+            source_description=message.source_description,
         )
 
-    for m in request.messages:
-        await async_worker.queue.put(partial(add_messages_task, m))
+    for message in request.messages:
+        await async_worker.queue.put(partial(add_messages_task, message))
 
     return Result(message='Messages added to processing queue', success=True)
+
+
+@router.post(
+    '/episodes',
+    status_code=status.HTTP_200_OK,
+    response_model=AddEpisodeResults,
+    summary='Add a native Graphiti episode',
+    description=(
+        'Directly calls `graphiti.add_episode(...)` and supports native Graphiti episode '
+        'sources `message`, `text`, and `json`.'
+    ),
+)
+async def add_episode(
+    request: AddEpisodeRequest,
+    graphiti: ZepGraphitiDep,
+) -> AddEpisodeResults:
+    return await graphiti.add_episode(
+        uuid=request.uuid,
+        group_id=request.group_id,
+        name=request.name,
+        episode_body=request.episode_body,
+        reference_time=request.reference_time,
+        source=request.source,
+        source_description=request.source_description,
+        update_communities=request.update_communities,
+        excluded_entity_types=request.excluded_entity_types,
+        previous_episode_uuids=request.previous_episode_uuids,
+        custom_extraction_instructions=request.custom_extraction_instructions,
+        saga=request.saga,
+        saga_previous_episode_uuid=request.saga_previous_episode_uuid,
+    )
 
 
 @router.post('/entity-node', status_code=status.HTTP_201_CREATED)
