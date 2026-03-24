@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
@@ -69,6 +70,26 @@ class ZepGraphiti(Graphiti):
             await episode.delete(self.driver)
         except NodeNotFoundError as e:
             raise HTTPException(status_code=404, detail=e.message) from e
+
+    async def get_episode(self, uuid: str) -> EpisodicNode:
+        try:
+            return await EpisodicNode.get_by_uuid(self.driver, uuid)
+        except NodeNotFoundError as e:
+            raise HTTPException(status_code=404, detail=e.message) from e
+
+    async def get_episodes(self, group_id: str, last_n: int | None = None) -> list[EpisodicNode]:
+        episodes = await EpisodicNode.get_by_group_ids(self.driver, [group_id])
+        episodes.sort(
+            key=lambda episode: (
+                episode.valid_at,
+                episode.created_at if isinstance(episode.created_at, datetime) else episode.valid_at,
+                episode.uuid,
+            ),
+            reverse=True,
+        )
+        if last_n is None:
+            return episodes
+        return episodes[:last_n]
 
 
 async def get_graphiti(settings: ZepEnvDep):

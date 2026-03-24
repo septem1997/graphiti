@@ -3,11 +3,18 @@ from contextlib import asynccontextmanager
 from functools import partial
 
 from fastapi import APIRouter, FastAPI, status
-from graphiti_core.graphiti import AddEpisodeResults  # type: ignore
 from graphiti_core.nodes import EpisodeType  # type: ignore
 from graphiti_core.utils.maintenance.graph_data_operations import clear_data  # type: ignore
 
-from graph_service.dto import AddEntityNodeRequest, AddEpisodeRequest, AddMessagesRequest, Message, Result
+from graph_service.dto import (
+    AddEntityNodeRequest,
+    AddEpisodeRequest,
+    AddEpisodeResponse,
+    AddMessagesRequest,
+    Message,
+    Result,
+)
+from graph_service.dto.episodes import episode_response_from_node
 from graph_service.zep_graphiti import ZepGraphitiDep
 
 
@@ -84,7 +91,7 @@ async def add_messages(
 @router.post(
     '/episodes',
     status_code=status.HTTP_200_OK,
-    response_model=AddEpisodeResults,
+    response_model=AddEpisodeResponse,
     summary='Add a native Graphiti episode',
     description=(
         'Directly calls `graphiti.add_episode(...)` and supports native Graphiti episode '
@@ -94,8 +101,8 @@ async def add_messages(
 async def add_episode(
     request: AddEpisodeRequest,
     graphiti: ZepGraphitiDep,
-) -> AddEpisodeResults:
-    return await graphiti.add_episode(
+) -> AddEpisodeResponse:
+    result = await graphiti.add_episode(
         uuid=request.uuid,
         group_id=request.group_id,
         name=request.name,
@@ -109,6 +116,10 @@ async def add_episode(
         custom_extraction_instructions=request.custom_extraction_instructions,
         saga=request.saga,
         saga_previous_episode_uuid=request.saga_previous_episode_uuid,
+    )
+    return AddEpisodeResponse(
+        episode_id=result.episode.uuid,
+        episode=episode_response_from_node(result.episode),
     )
 
 

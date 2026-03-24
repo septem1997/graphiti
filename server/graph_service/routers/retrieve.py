@@ -1,14 +1,14 @@
-from datetime import datetime, timezone
-
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 
 from graph_service.dto import (
+    EpisodeResponse,
     GetMemoryRequest,
     GetMemoryResponse,
     Message,
     SearchQuery,
     SearchResults,
 )
+from graph_service.dto.episodes import episode_response_from_node
 from graph_service.zep_graphiti import ZepGraphitiDep, get_fact_result_from_edge
 
 router = APIRouter()
@@ -33,12 +33,20 @@ async def get_entity_edge(uuid: str, graphiti: ZepGraphitiDep):
     return get_fact_result_from_edge(entity_edge)
 
 
-@router.get('/episodes/{group_id}', status_code=status.HTTP_200_OK)
-async def get_episodes(group_id: str, last_n: int, graphiti: ZepGraphitiDep):
-    episodes = await graphiti.retrieve_episodes(
-        group_ids=[group_id], last_n=last_n, reference_time=datetime.now(timezone.utc)
-    )
-    return episodes
+@router.get('/episodes/{group_id}', status_code=status.HTTP_200_OK, response_model=list[EpisodeResponse])
+async def get_episodes(
+    group_id: str,
+    graphiti: ZepGraphitiDep,
+    last_n: int | None = Query(default=None, ge=1),
+) -> list[EpisodeResponse]:
+    episodes = await graphiti.get_episodes(group_id, last_n=last_n)
+    return [episode_response_from_node(episode) for episode in episodes]
+
+
+@router.get('/episode/{uuid}', status_code=status.HTTP_200_OK, response_model=EpisodeResponse)
+async def get_episode(uuid: str, graphiti: ZepGraphitiDep):
+    episode = await graphiti.get_episode(uuid)
+    return episode_response_from_node(episode)
 
 
 @router.post('/get-memory', status_code=status.HTTP_200_OK)

@@ -29,7 +29,10 @@ The REST server exposes `POST /episodes` for native `graphiti.add_episode(...)` 
 
 - `source` supports `message`, `text`, and `json`
 - `episode_body` is passed through directly to Graphiti
-- the endpoint directly calls `graphiti.add_episode(...)` and returns the native result payload
+- the endpoint directly calls `graphiti.add_episode(...)`
+- the response returns a stable `episode_id` plus a minimal episode payload
+- `GET /episode/{uuid}` returns the exact stored episode by id
+- `GET /episodes/{group_id}` returns episodes for the group ordered by `reference_time` descending
 
 Example:
 
@@ -39,7 +42,8 @@ Example:
   "name": "daily-summary",
   "episode_body": "{\"customer_id\":\"123\",\"plan\":\"pro\"}",
   "source": "json",
-  "source_description": "crm webhook"
+  "source_description": "crm webhook",
+  "reference_time": "2026-03-22T12:34:56Z"
 }
 ```
 
