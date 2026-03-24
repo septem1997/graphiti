@@ -4,7 +4,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
   echo "Usage: $0 <image-repo> [tag]" >&2
-  echo "Example: $0 ghcr.io/acme/graphiti-rest 0.28.2-episodes-v1" >&2
+  echo "Example: $0 ghcr.io/septem1997/graphiti-rest 0.28.2-episodes-v1" >&2
   exit 1
 fi
 

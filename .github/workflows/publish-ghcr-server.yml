@@ -1,0 +1,75 @@
+name: Publish Server Image to GHCR
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to publish'
+        required: true
+        default: '0.28.2-episodes-v1'
+      graphiti_version:
+        description: 'graphiti-core version to bake into the image'
+        required: true
+        default: '0.28.2'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/graphiti-rest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ github.event.inputs.image_tag }}
+            type=sha,prefix=sha-
+          labels: |
+            org.opencontainers.image.title=Graphiti FastAPI Server
+            org.opencontainers.image.description=FastAPI server for Graphiti temporal knowledge graphs
+            org.opencontainers.image.version=${{ github.event.inputs.image_tag }}
+            io.graphiti.core.version=${{ github.event.inputs.graphiti_version }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GRAPHITI_VERSION=${{ github.event.inputs.graphiti_version }}
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VCS_REF=${{ github.sha }}
+
+      - name: Summary
+        run: |
+          echo "## GHCR image published" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image: ${{ env.IMAGE_NAME }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: ${{ github.event.inputs.image_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Graphiti core version: ${{ github.event.inputs.graphiti_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          echo "docker pull ${{ env.IMAGE_NAME }}:${{ github.event.inputs.image_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

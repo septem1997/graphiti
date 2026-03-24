@@ -16,8 +16,15 @@ its bundled Neo4j dependency.
 Build and push a tagged image:
 
 ```bash
-./scripts/build-push-graphiti-rest.sh ghcr.io/your-org/graphiti-rest 0.28.2-episodes-v1
+./scripts/build-push-graphiti-rest.sh ghcr.io/septem1997/graphiti-rest 0.28.2-episodes-v1
 ```
+
+Or publish from GitHub Actions without logging into GHCR locally:
+
+- Push this repo to GitHub
+- Open `Actions`
+- Run `Publish Server Image to GHCR`
+- Use tag `0.28.2-episodes-v1`
 
 ## Deploy
 
