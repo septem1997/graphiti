@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
+from graph_service.dto.episodes import EpisodeResponse
 from graph_service.dto.common import Message
 
 
@@ -11,16 +12,35 @@ class SearchQuery(BaseModel):
     )
     query: str
     max_facts: int = Field(default=10, description='The maximum number of facts to retrieve')
+    only_active: bool = Field(
+        default=False,
+        description='When true, filter out facts that are invalidated or expired',
+    )
+    include_linked_episodes: bool = Field(
+        default=True,
+        description='When true, include linked episodic nodes for each fact',
+    )
+    max_linked_episodes_per_fact: int = Field(
+        default=3,
+        ge=0,
+        description='Maximum number of linked episodes to include for each fact',
+    )
 
 
 class FactResult(BaseModel):
     uuid: str
     name: str
     fact: str
+    group_id: str | None = None
+    source_node_uuid: str | None = None
+    target_node_uuid: str | None = None
     valid_at: datetime | None
     invalid_at: datetime | None
     created_at: datetime
     expired_at: datetime | None
+    score: float | None = None
+    episode_uuids: list[str] = Field(default_factory=list)
+    episodes: list[EpisodeResponse] = Field(default_factory=list)
 
     class Config:
         json_encoders = {datetime: lambda v: v.astimezone(timezone.utc).isoformat()}

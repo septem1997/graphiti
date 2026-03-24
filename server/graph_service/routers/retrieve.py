@@ -4,33 +4,36 @@ from graph_service.dto import (
     EpisodeResponse,
     GetMemoryRequest,
     GetMemoryResponse,
+    FactResult,
     Message,
     SearchQuery,
     SearchResults,
 )
 from graph_service.dto.episodes import episode_response_from_node
-from graph_service.zep_graphiti import ZepGraphitiDep, get_fact_result_from_edge
+from graph_service.zep_graphiti import ZepGraphitiDep
 
 router = APIRouter()
 
 
 @router.post('/search', status_code=status.HTTP_200_OK)
 async def search(query: SearchQuery, graphiti: ZepGraphitiDep):
-    relevant_edges = await graphiti.search(
-        group_ids=query.group_ids,
+    facts = await graphiti.search_facts(
         query=query.query,
-        num_results=query.max_facts,
+        group_ids=query.group_ids,
+        max_facts=query.max_facts,
+        only_active=query.only_active,
+        include_linked_episodes=query.include_linked_episodes,
+        max_linked_episodes_per_fact=query.max_linked_episodes_per_fact,
     )
-    facts = [get_fact_result_from_edge(edge) for edge in relevant_edges]
     return SearchResults(
         facts=facts,
     )
 
 
-@router.get('/entity-edge/{uuid}', status_code=status.HTTP_200_OK)
+@router.get('/entity-edge/{uuid}', status_code=status.HTTP_200_OK, response_model=FactResult)
 async def get_entity_edge(uuid: str, graphiti: ZepGraphitiDep):
     entity_edge = await graphiti.get_entity_edge(uuid)
-    return get_fact_result_from_edge(entity_edge)
+    return await graphiti.get_fact_result(entity_edge)
 
 
 @router.get('/episodes/{group_id}', status_code=status.HTTP_200_OK, response_model=list[EpisodeResponse])
@@ -55,12 +58,11 @@ async def get_memory(
     graphiti: ZepGraphitiDep,
 ):
     combined_query = compose_query_from_messages(request.messages)
-    result = await graphiti.search(
-        group_ids=[request.group_id],
+    facts = await graphiti.search_facts(
         query=combined_query,
-        num_results=request.max_facts,
+        group_ids=[request.group_id],
+        max_facts=request.max_facts,
     )
-    facts = [get_fact_result_from_edge(edge) for edge in result]
     return GetMemoryResponse(facts=facts)
 
 

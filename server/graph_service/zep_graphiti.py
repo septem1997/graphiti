@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from typing import Annotated
@@ -8,9 +9,11 @@ from graphiti_core.edges import EntityEdge  # type: ignore
 from graphiti_core.errors import EdgeNotFoundError, GroupsEdgesNotFoundError, NodeNotFoundError
 from graphiti_core.llm_client import LLMClient  # type: ignore
 from graphiti_core.nodes import EntityNode, EpisodicNode  # type: ignore
+from graphiti_core.search.search_config_recipes import EDGE_HYBRID_SEARCH_RRF  # type: ignore
 
 from graph_service.config import ZepEnvDep
 from graph_service.dto import FactResult
+from graph_service.dto.episodes import EpisodeResponse, episode_response_from_node
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +94,94 @@ class ZepGraphiti(Graphiti):
             return episodes
         return episodes[:last_n]
 
+    async def get_linked_episode_responses(
+        self,
+        episode_uuids: list[str],
+        max_linked_episodes_per_fact: int,
+    ) -> list[EpisodeResponse]:
+        if not episode_uuids or max_linked_episodes_per_fact <= 0:
+            return []
+
+        selected_episode_uuids = episode_uuids[:max_linked_episodes_per_fact]
+        linked_episodes = await EpisodicNode.get_by_uuids(self.driver, selected_episode_uuids)
+        episodes_by_uuid = {episode.uuid: episode for episode in linked_episodes}
+        return [
+            episode_response_from_node(episodes_by_uuid[episode_uuid])
+            for episode_uuid in selected_episode_uuids
+            if episode_uuid in episodes_by_uuid
+        ]
+
+    async def get_fact_result(
+        self,
+        edge: EntityEdge,
+        score: float | None = None,
+        include_linked_episodes: bool = True,
+        max_linked_episodes_per_fact: int = 3,
+    ) -> FactResult:
+        linked_episodes = []
+        if include_linked_episodes:
+            linked_episodes = await self.get_linked_episode_responses(
+                edge.episodes,
+                max_linked_episodes_per_fact=max_linked_episodes_per_fact,
+            )
+
+        return FactResult(
+            uuid=edge.uuid,
+            name=edge.name,
+            fact=edge.fact,
+            group_id=edge.group_id,
+            source_node_uuid=edge.source_node_uuid,
+            target_node_uuid=edge.target_node_uuid,
+            valid_at=edge.valid_at,
+            invalid_at=edge.invalid_at,
+            created_at=edge.created_at,
+            expired_at=edge.expired_at,
+            score=float(score) if score is not None else None,
+            episode_uuids=edge.episodes,
+            episodes=linked_episodes,
+        )
+
+    async def search_facts(
+        self,
+        query: str,
+        group_ids: list[str] | None,
+        max_facts: int = 10,
+        only_active: bool = False,
+        include_linked_episodes: bool = True,
+        max_linked_episodes_per_fact: int = 3,
+    ) -> list[FactResult]:
+        search_config = EDGE_HYBRID_SEARCH_RRF.model_copy(deep=True)
+        search_config.limit = max_facts
+
+        search_results = await self.search_(
+            query=query,
+            config=search_config,
+            group_ids=group_ids,
+        )
+
+        filtered_edges_with_scores = []
+        for index, edge in enumerate(search_results.edges):
+            if only_active and (edge.invalid_at is not None or edge.expired_at is not None):
+                continue
+            score = (
+                search_results.edge_reranker_scores[index]
+                if index < len(search_results.edge_reranker_scores)
+                else None
+            )
+            filtered_edges_with_scores.append((edge, score))
+
+        return await asyncio.gather(
+            *[
+                self.get_fact_result(
+                    edge,
+                    score=score,
+                    include_linked_episodes=include_linked_episodes,
+                    max_linked_episodes_per_fact=max_linked_episodes_per_fact,
+                )
+                for edge, score in filtered_edges_with_scores
+            ]
+        )
+
 
 async def get_graphiti(settings: ZepEnvDep):
     client = ZepGraphiti(
@@ -117,18 +208,6 @@ async def initialize_graphiti(settings: ZepEnvDep):
         password=settings.neo4j_password,
     )
     await client.build_indices_and_constraints()
-
-
-def get_fact_result_from_edge(edge: EntityEdge):
-    return FactResult(
-        uuid=edge.uuid,
-        name=edge.name,
-        fact=edge.fact,
-        valid_at=edge.valid_at,
-        invalid_at=edge.invalid_at,
-        created_at=edge.created_at,
-        expired_at=edge.expired_at,
-    )
 
 
 ZepGraphitiDep = Annotated[ZepGraphiti, Depends(get_graphiti)]
