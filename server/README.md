@@ -57,6 +57,10 @@ Example:
 
    ```
    OPENAI_API_KEY=your_openai_api_key
+   OPENAI_BASE_URL=https://ai-gateway.vercel.sh/v1
+   MODEL_NAME=openai/gpt-4.1-mini
+   SMALL_MODEL_NAME=openai/gpt-4.1-nano
+   EMBEDDING_MODEL_NAME=openai/text-embedding-3-small
    NEO4J_USER=your_neo4j_user
    NEO4J_PASSWORD=your_neo4j_password
    NEO4J_PORT=your_neo4j_port
@@ -77,6 +81,10 @@ Example:
          
          environment:
             - OPENAI_API_KEY=${OPENAI_API_KEY}
+            - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+            - MODEL_NAME=${MODEL_NAME}
+            - SMALL_MODEL_NAME=${SMALL_MODEL_NAME}
+            - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME}
             - NEO4J_URI=bolt://neo4j:${NEO4J_PORT}
             - NEO4J_USER=${NEO4J_USER}
             - NEO4J_PASSWORD=${NEO4J_PASSWORD}
