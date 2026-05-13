@@ -1,5 +1,25 @@
 # Repository Guidelines
 
+## Project Context
+This repository is maintained as a fork/customization of the upstream open-source
+Graphiti Python project. The core Graphiti library is Python-first, while downstream
+consumer projects in this workspace are often Node.js services that cannot import the
+Python package directly.
+
+For that reason, this repo also owns a Dockerized FastAPI REST service under
+`server/graph_service/`. Treat that REST layer as the primary integration surface for
+other projects: endpoints such as `POST /episodes`, search APIs, response schemas,
+health checks, Docker image behavior, and deployment compose/stack files are
+consumer-facing contracts. Changes there should consider Node.js callers and
+Docker/Swarm deployments, not just local Python library usage.
+
+The upstream/default Docker image may lag behind this fork's needs, so custom image
+builds and deployment files in this repository are part of the maintained product
+surface. When deciding where to make a change, distinguish between:
+- `graphiti_core/`: upstream-like Python core behavior.
+- `server/graph_service/`: custom REST API wrapper used by external services.
+- Docker/compose/stack files: deployment behavior for consumers of the REST image.
+
 ## Project Structure & Module Organization
 Graphiti's core library lives under `graphiti_core/`, split into domain modules such as `nodes.py`, `edges.py`, `models/`, and `search/` for retrieval pipelines. Service adapters and API glue reside in `server/graph_service/`, while the MCP integration lives in `mcp_server/`. Shared assets and collateral sit in `images/` and `examples/`. Tests cover the package via `tests/`, with configuration in `conftest.py`, `pytest.ini`, and Docker compose files for optional services. Tooling manifests live at the repo root, including `pyproject.toml`, `Makefile`, and deployment compose files.
 
